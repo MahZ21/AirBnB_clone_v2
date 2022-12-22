@@ -1,40 +1,56 @@
 #!/usr/bin/python3
-"""
-    Distributes an archive to your web servers,
-    using the function do_deploy
-    def do_deploy(archive_path):
-    Return False iff archive path doesn't exist
-"""
+'''
+fabric script that generates a .tgz archive from
+the contents of web_static
+distributes archive to web servers
+'''
+from fabric.api import env, put, run
+from os import path
+import logging
 
-from fabric.api import put, run, env
-from os.path import exists
-env.hosts = ['3.229.113.167', '3.234.210.158']
-env.user = 'ubuntu'
-env.identity = '~/.ssh/school'
-env.password = None
 
+logging.basicConfig()
+paramiko_logger = logging.getLogger("paramiko.transport")
+paramiko_logger.disabled = True
+env.hosts = ['34.75.183.8', '34.139.231.119']
 
 def do_deploy(archive_path):
-    """
-    Deploys an archive to a server
-    """
-    if exists(archive_path) is False:
-        return False
-    try:
-        file_N = archive_path.split("/")[-1]
-        n = file_N.split(".")[0]
-        path = "/data/web_static/releases/"
-        put(archive_path, '/tmp/')
-        run('mkdir -p {}{}/'.format(path, n))
-        run('tar -xzf /tmp/{} -C {}{}/'.format(file_N, path, n))
-        run('rm /tmp/{}'.format(file_N))
-        run('mv {0}{1}/web_static/* {0}{1}/'.format(path, n))
-        run('rm -rf {}{}/web_static'.format(path, n))
-        run('rm -rf /data/web_static/current')
-        run('ln -s {}{}/ /data/web_static/current'.format(path, n))
-        run('chmod -R 755 /data/')
-        print("New version deployed!")
+    '''
+    distributes archive to web servers
+    Args:
+        archive_path(str): Path of archive to be distributed
+    Returns:
+        True if it succeeds, False if it fails at any point
+    '''
+    file = archive_path.split('/')[-1]
+    name = archive_path.split('.')[0]
+    if path.isfile(archive_path):
+        if put(archive_path, '/tmp/{}'.format(file)).failed is True:
+            return False
+        if run('rm -rf /data/web_static/releases/{}/'.
+               format(name)).failed is True:
+            return False
+        if run('mkdir -p /data/webstatic/releases/{}/'.
+               format(name)).failed is True:
+            return False
+        if run('tar -xzf /tmp/{} -C /data/web_static/releases/{}'.format(
+                file, name)).failed is True:
+            return False
+        if run('rm /tmp/{}'.format(file)).failed is True:
+            return False
+        if run("mv /data/web_static/releases/{}/web_static/* "
+               "/data/web_static/releases/{}/".format(
+                       name,
+                       name)).failed is True:
+            return False
+        if run("rm -rf /data/web_static/releases/{}/web_static".
+               format(name)).failed is True:
+            return False
+        if run('rm /data/web_static/current').failed is True:
+            return False
+        if run('ln -s /data/web_static/releases/{} /data/web_static/current'
+               .format(name)).failed is True:
+            return False
         return True
-    except FileNotFoundError:
-        return False
+    return False
         
